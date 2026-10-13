@@ -16,7 +16,7 @@ The target variable is Revenue, with 1 indicating that the session ended in a pu
 
 The dataset has no missing values, while 125 rows were found to be duplicates of other rows. I retained them because identical recorded attributes may not mean a session was recorded twice (the dataset has no session identifier to guarantee the distinction).
 
-This dataset is thus a very natural choice — an e-commerce business decision with necessary preprocessing, features with skewed distributions, potential concerns for the later sections of the report, and sets of behavioral ans seasonal features. It's also small enough to commit and retrain comfortably. 
+This dataset is thus a very natural choice — an e-commerce business decision with necessary preprocessing, features with skewed distributions, potential concerns for the later sections of the report, and sets of behavioral and seasonal features. It's also small enough to commit and retrain comfortably. 
 
 It should be noted that each recorded row represents a *completed* session, even though business decisions for this project are made at session entry. 
 
@@ -107,6 +107,7 @@ The following information is thus excluded from the model input list: `Administr
 | B: A + cyclical calendar | 0.1294 | 0.1009 | **0.6133** | 0.5019 | 0.9508 |
 | C: B + visitor interactions | 0.1367 | 0.1064 | 0.6118 | 0.5007 | **0.9462** |
 | D: C + traffic/visitor segment | **0.1426** | 0.1141 | 0.6119 | **0.5001** | 0.9483 |
+| E: D + session activity (ORACLE, not deployable) | **0.7038** | **0.2443** | **0.8436** | **0.4085** | 0.5366 |
 
 D was chosen for the pipeline, despite not being the "winner" for all evaluation quantities. D is prioritised because it achieved the highest average monthly purchaser recall under our threshold — which is perfectly consistent with my main goal (to identify eventual purchasers). It also increases higher average contact share. The improvement over C is in any case not all that substantial and comes at the cost of a slightly higher "cost", which is derived from hypothetical units. 
 
@@ -151,6 +152,8 @@ The C candidates were .1 and 1, which were selected using mean historical log-lo
 | November validation log loss | 0.582616 | 0.582616 | 0.582616 |
 
 Maximum absolute **December probability** difference: scikit-learn vs manual = **0.00013171**; scikit-learn vs standard PyTorch = **0.00013171**; manual vs standard PyTorch = **0.0**.
+
+The minimum difference is most likely because the full-batch gradient didn't fully converge — it can be seen that, the more epochs, the lower the difference (1000 epochs => 2.32e-02, 20000 epochs => 3.42 e-07)
 
 
 ----
@@ -210,9 +213,9 @@ Policy A's cutoff is 0.25, using historical folds for Jul-Nov.
 
 ## Limitations & next steps
 
-- **Temporal change and probability reliability** (average November purchase probability of 16.36% vs. actual positive rate of 25.35%). The difference between the training November and December purchase rates indicates purchasing behavior is likely to chance a lot over time. With more historical data, it would be useful to examine probability calibration separately by period, and trying to see if more recent training data improves the reliability of these probabilities.
+- **Temporal change and probability reliability** (average November purchase probability of 16.36% vs. actual positive rate of 25.35%). The difference between the training November and December purchase rates indicates purchasing behavior is likely to change a lot over time. With more historical data, it would be useful to examine probability calibration separately by period, and trying to see if more recent training data improves the reliability of these probabilities.
 - **The 20% hypothetical staffing cap is never fully in force**, with all candidates exceeding it at some point. Perhaps an adaptive cutoff of sorts could be implemented — if timestamps existed, these could use actual visitor arrival times and the corresponding staff availability.
-- **Very limited temporal information**, since there is nothing deeper than month (week, day, timestamp...). To make matters worse, January and April are absent. Although the cyclicar calendar features I incoprorated try to represent month to month continuity, it's hard to generalise. The dataset definitely struggles because of that, so further data collection would be very helpful.
+- **Very limited temporal information**, since there is nothing deeper than month (week, day, timestamp...). To make matters worse, January and April are absent. Although the cyclical calendar features I incorporated try to represent month to month continuity, it's hard to generalise. The dataset definitely struggles because of that, so further data collection would be very helpful.
 - **The cost scenarios are fully hypothetical** and may have led to a biased conclusion. If I could obtain the cost of customer assistance, the specific outcome of a proper assistance, or information on customer-value, that would enhance the choice of economic penalty.
 - **No causal effect of assistance**, since the dataset does not record if assistance changed a browser's decision. Perhaps running an experiment that could determine if proactive assistance actually changes purchase likelihood or customer satisfaction would amplify the scope of the project, and ultimately help the business.
 
