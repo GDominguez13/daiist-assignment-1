@@ -13,7 +13,7 @@ rows/columns, and why did you pick it.*
 This is the Online Shoppers Purchasing Intention Dataset (Sakar and Kastro, 2018), available from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/468/online+shoppers+purchasing+intention+dataset) (DOI: [10.24432/C5F88Q](https://doi.org/10.24432/C5F88Q)). The local file used is `data/shopping.csv`. 
 
 This dataset contains 12,330 rows and 18 columns. 
-- Each row s 1 completed browsing session on a website (entered, browsed, left)
+- Each row is 1 completed browsing session on a website (entered, browsed, left)
 - Each column represents a variable (input, 17 + outcome), and these variables describe the different facets of the browsing activity (number of pages visited, time spent on each category, website analytics, visitor characteristics, calendar...)
 
 The dataset also has no missing values.
@@ -23,6 +23,8 @@ The target variable is Revenue, which is not a fixed number but rather a binary 
 This dataset is thus a very natural choice — an e-commerce business decision with necessary preprocessing, features with skewed distributions, potential concerns for the later sections of the report, and sets of behavioral ans seasonal features. It's also small enough to commit and retrain comfortably. 
 
 It should be noted that each recorded row represents a completed session, even though business decisions for this project are made at session entry. 
+
+------
 
 ## Business / real-life framing
 
@@ -44,7 +46,9 @@ The predicted target is **not** the additional sales that offering support may l
 
 A False Negative thus isn't a lost sale, and a False Positive does not mean the assistance was worthless because of dataset limitations.
 
-**Operating assumptions**
+----
+
+### **Operating assumptions**
 - Assistance budget: the company can assist up to 20% of sessions at most, a figure that is assessed as a monthly proportion during historical validation.
 - Business goal to choose the best policy: maximize monthly purchaser recall (while meeting the assistance constraint just outlined)
 - Cost per contact: 1 (units)
@@ -53,13 +57,16 @@ A False Negative thus isn't a lost sale, and a False Positive does not mean the 
 - Derived cost formula: 1 * (TP + FP) + 5 * FN
 
 
+----
 
-**Temporal evaluation**
+### **Temporal evaluation**
 I used a monthly chronological split since the intended app wants to predict outcomes for later sessions making use of earlier ones — a random split could mix them from different months and be too optimistic. 
 
 I separated the observations into February-October (Training, 7605), November (Validation, 2998) and December (Testing, 1727). 
 
 The historical expanding-window folds predict July-November by using prior observations, while "policy replay" evaluates September with July and August, October with July-September, and November with July-October. 
+
+----
 
 ## Data preparation & feature engineering
 
@@ -68,34 +75,38 @@ the way — e.g. "segment X had defective data, so I excluded it and used a
 population-average default for scope Y at inference time; the impact of
 that choice is Z."*
 
-*Revenue* and *Weekend* were converted to integer 0 and 1s. 
+`Revenue` and `Weekend` were converted to integer 0 and 1s. 
 Months were mapped to numbers for splitting and calendar transformations.
 
 The final model uses 12 selected input columns
-- *StandardScaler* standardizes the 6 numerical columns
-- *OneHotEncoder(drop="first", handle_unknown="ignore", sparse_output=False)* transforms the 6 categorical columns into indicators
+- StandardScaler standardizes the 6 numerical columns
+- OneHotEncoder(drop="first", handle_unknown="ignore", sparse_output=False) transforms the 6 categorical columns into indicators
 
-**Feature availability**
+----
+
+### **Feature availability**
 Because of the dataset's row nature (each row measures a completed session) contrasting with this project's ex-ante nature, it had to be clearly studied which features would be available at the beginning of each visit.
 
 | Input group | Fields supplied to the model |
 |---|---|
-| Original numeric | `SpecialDay`, `Weekend` |
-| Original categorical | `OperatingSystems`, `Browser`, `Region`, `TrafficType`, `VisitorType` |
-| Cyclical calendar engineering | `MonthSin = sin(2π × MonthNum / 12)`, `MonthCos = cos(2π × MonthNum / 12)` |
-| Visitor/calendar interactions | `ReturningWeekend = 1[returning] × Weekend`, `ReturningSpecialDay = 1[returning] × SpecialDay` |
-| Visitor/source interaction | `TrafficVisitorSegment = TrafficType + "__" + VisitorType`, treated categorically |
+| Originally numeric | `SpecialDay`, `Weekend` |
+| Originally categorical | `OperatingSystems`, `Browser`, `Region`, `TrafficType`, `VisitorType` |
+| Calendar engineering (cyclical) | `MonthSin = sin(2π × MonthNum / 12)`, `MonthCos = cos(2π × MonthNum / 12)` |
+| Visitor-calendar interaction | `ReturningWeekend = 1[returning] × Weekend`, `ReturningSpecialDay = 1[returning] × SpecialDay` |
+| Visitor-source interaction | `TrafficVisitorSegment = TrafficType + "__" + VisitorType`, treated categorically |
 
 The last 3 groups are hypotheses regarding calendar periodicity and relationships between type of visitor, and session context.
 
 Categorical traffic codes are not continuous quantities nor do their numerical distances have any meaning.
 
-MonthNum is not a final model input, only being created for splitting and to construct MonthSin and MonthCos. 
+MonthNum is not a final model input, only being created for splitting and to construct `MonthSin` and `MonthCos`. 
 
 The following information is thus excluded from the model input list: `Administrative`, `Administrative_Duration`, `Informational`, `Informational_Duration`, `ProductRelated`, `ProductRelated_Duration`, `BounceRates`, `ExitRates`, `PageValues`.
 - These fields may still appear in retrospective, descriptive dashboard charts, but the predictor does not make use of them.
 
-**Feature ablation output**
+----
+
+### **Feature ablation output**
 
 *Note: July–November; reported statistics average the five evaluation months; all candidates were compared using a fixed threshold of 0.25*
 
@@ -112,7 +123,9 @@ Of course, the improvement in recall isn't extremely notorious and the additiona
 
 It should be noted the ablation does not compare separately optimized operating policies, since they are all evaluated against the final specification's fixed threshold.
 
-**Data limitations present during running**
+----
+
+### **Data limitations present during running**
 - Validation and Test transformations produce `OneHotEncoder` warnings for categories not found in earlier training folds. 
 - The encoded columns include pretty specific traffic-visitor combinations, which may have limited historical basis.
 
@@ -142,7 +155,9 @@ The PyTorch models start with 0 weights and bias, while the manual version compu
 The C candidates were .1 and 1, which were selected using mean historical log-loss. .1 was chosen for the final run (July–August selection scores: 0.457 vs 0.471).
 
 
-**Model agreement**
+----
+
+### **Model agreement**
 
 | Diagnostic | Scikit-learn | Manual PyTorch | Standard PyTorch |
 |---|---:|---:|---:|
@@ -152,7 +167,9 @@ The C candidates were .1 and 1, which were selected using mean historical log-lo
 Maximum absolute **December probability** difference: scikit-learn vs manual = **0.00013171**; scikit-learn vs standard PyTorch = **0.00013171**; manual vs standard PyTorch = **0.0**.
 
 
-**December holdout comparison (0.50 classification threshold, "Standard")**
+----
+
+### **December holdout comparison (0.50 classification threshold, "Standard")**
 
 | Model | Accuracy | Precision | Recall | ROC-AUC | Log loss | Scenario cost |
 |---|---:|---:|---:|---:|---:|---:|
@@ -164,7 +181,9 @@ Maximum absolute **December probability** difference: scikit-learn vs manual = *
 The learned models have higher ROC-AUC and lower log loss than the constant baselines.
 
 
-**December holdout, frozen 0.25 threshold (Policy A):**
+----
+
+### **December holdout, frozen 0.25 threshold (Policy A):**
 
 | Model | Contacts | TP | FP | FN | TN | Precision | Recall | Scenario cost |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -177,7 +196,9 @@ This policy contacts 7.87% of December visitors. Purchasers represent 22.79% of 
 
 This means that, under the hypothetical cost scenario outlined earlier, we are saving 19 (units) in comparison to contacting nobody.
 
-**Historical policy**
+----
+
+### **Historical policy**
 
 I ran 3 fixed-cutoff strategies, replayed on Sep-Nov, using calibration info for each evaluation month.
 
@@ -206,8 +227,9 @@ more time or data — not generic hedging.*
 
 ## Generative AI use disclosure
 
-AI was used for four different goals: code refinement, app development, completionism, and proper functionality.
-- Code refinement: more complex and detailed parts of the code were produced by AI, starting off of a baseline created by me.
-- App development: the Gradio app is 99% created by AI, as authorised in-class by the instructor — I pulled off a very basic iteration of it by hand but I would have never been able to do it without it.
-- Completionism: While evaluating potential improvements, AI came up with a couple good ideas that it helped explain and then implement. This includes the historical policy experiment, and the rolling month validation.
-- Proper functionality: identification and understanding of errors in-code and during running, learning how to properly commit, etc.
+AI was used for 5 different purposes:
+1. **Code refinement**: more complex and detailed parts of the code were produced by AI, starting off of a baseline created by me.
+2. **App development**: the Gradio app is 99% created by AI, as authorised in-class by the instructor — I pulled off a very basic iteration of it by hand but I would have never been able to do it without it.
+3. **Completionism**: While evaluating potential improvements, AI came up with a couple good ideas that it helped explain and then implement. This includes the historical policy experiment, and the rolling month validation.
+4. **Report formatting cleanup**: for a better understanding of markdown format and also better visibility, AI was used to identify areas where the format's legibility could be improved.
+5. **Proper functionality**: identification and understanding of errors in-code and during running, learning how to properly commit, etc.
