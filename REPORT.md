@@ -107,11 +107,13 @@ The following information is thus excluded from the model input list: `Administr
 | B: A + cyclical calendar | 0.1294 | 0.1009 | **0.6133** | 0.5019 | 0.9508 |
 | C: B + visitor interactions | 0.1367 | 0.1064 | 0.6118 | 0.5007 | **0.9462** |
 | D: C + traffic/visitor segment | **0.1426** | 0.1141 | 0.6119 | **0.5001** | 0.9483 |
-| E: D + session activity (ORACLE, not deployable) | **0.7038** | **0.2443** | **0.8436** | **0.4085** | 0.5366 |
+| E: D + session activity (ORACLE, not deployable) | **0.7038** | **0.2443** | **0.8436** | **0.4085** | **0.5366** |
 
 D was chosen for the pipeline, despite not being the "winner" for all evaluation quantities. D is prioritised because it achieved the highest average monthly purchaser recall under our threshold — which is perfectly consistent with my main goal (to identify eventual purchasers). It also increases higher average contact share. The improvement over C is in any case not all that substantial and comes at the cost of a slightly higher "cost", which is derived from hypothetical units. 
 
 All four were evaluated on the same expanding window folds, with the same regularization strength and the fixed 0.25 threshold, so the comparison does not show each specification receiving its own optimized policy — more proof to say either D or C would have been fair choices. 
+
+Meanwhile, E added fields only known once a session ended: log-transformed page counts, durations and PageValues; Bounce and Exit rates, total pages viewed... using the same expanding window folds, the advantage seen is tremendous, winning in all departments. This is a key experiment in that it shows the predictive signal of the dataset resides in what visitors do DURING the session — partly because many attributes it uses, such as PageValues, represent behavior close to the purchase itself. This analysis was carried out to justify: 1. why the predictive power struggles to go up under our current ex-ante model, 2. if a mid-session trigger existed, this would have an extremely strong use case, much stronger than right now. 
 
 ----
 
