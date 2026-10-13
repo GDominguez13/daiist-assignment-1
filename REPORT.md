@@ -7,31 +7,22 @@
 
 ## Dataset
 
-*What is it, where did you get it, what does one row represent, how many
-rows/columns, and why did you pick it.*
-
 This is the Online Shoppers Purchasing Intention Dataset (Sakar and Kastro, 2018), available from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/468/online+shoppers+purchasing+intention+dataset) (DOI: [10.24432/C5F88Q](https://doi.org/10.24432/C5F88Q)). The local file used is `data/shopping.csv`. 
 
-This dataset contains 12,330 rows and 18 columns. 
-- Each row is 1 completed browsing session on a website (entered, browsed, left)
-- Each column represents a variable (input, 17 + outcome), and these variables describe the different facets of the browsing activity (number of pages visited, time spent on each category, website analytics, visitor characteristics, calendar...)
+This dataset contains 12,330 rows and 18 columns (17 explanatory variables and 1 binary target, Revenue). 
+- Each row is 1 completed browsing session on a website (entered, browsed, left), including information about website activity, characteristics, calendar, and finally whether a purchase took place or not.
 
-The dataset also has no missing values.
+The target variable is Revenue, with 1 indicating that the session ended in a purchase and 0 indicating no purchase took place. 15.5% of sessions were purchasing, and 84.5% were non-purchasing, which makes this an imbalanced, binary classification task.
 
-The target variable is Revenue, which is not a fixed number but rather a binary indicator of whether a session led to a purchase. 15.5% of sessions were purchasing, and 84.5% were non-purchasing, which makes this an imbalanced, binary classification task.
+The dataset has no missing values, while 125 rows were found to be duplicates of other rows. I retained them because identical recorded attributes may not mean a session was recorded twice (the dataset has no session identifier to guarantee the distinction).
 
 This dataset is thus a very natural choice — an e-commerce business decision with necessary preprocessing, features with skewed distributions, potential concerns for the later sections of the report, and sets of behavioral ans seasonal features. It's also small enough to commit and retrain comfortably. 
 
-It should be noted that each recorded row represents a completed session, even though business decisions for this project are made at session entry. 
+It should be noted that each recorded row represents a *completed* session, even though business decisions for this project are made at session entry. 
 
 ------
 
 ## Business / real-life framing
-
-*The hypothetical scenario this model serves, and what that scenario implies
-for how you built the pipeline — target definition, whether a time-based
-split was necessary and why (or why not), which metric should drive the
-decision threshold and why.*
 
 Take an e-commerce company. 
 They have a pretty limited number of customer support agents, so the company wants to identify, at the beginning of a visit, which visitors appear most likely to make a purchase, thus benefitting from immediate assistance.
@@ -51,11 +42,10 @@ A False Negative thus isn't a lost sale, and a False Positive does not mean the 
 ### **Operating assumptions**
 - Assistance budget: the company can assist up to 20% of sessions at most, a figure that is assessed as a monthly proportion during historical validation.
 - Business goal to choose the best policy: maximize monthly purchaser recall (while meeting the assistance constraint just outlined)
-- Cost per contact: 1 (units)
+- **Cost per contact**: 1 (units)
 - FN cost: 5 (units)
-    - This 1:5 ratio is not proven and remains hypothetical, but feels fair because of the department's main goal being to deliver actual support.
+    - This 1:5 ratio is not proven and remains hypothetical, symbolizing an assumed preference from the department.
 - Derived cost formula: 1 * (TP + FP) + 5 * FN
-
 
 ----
 
@@ -64,16 +54,13 @@ I used a monthly chronological split since the intended app wants to predict out
 
 I separated the observations into February-October (Training, 7605), November (Validation, 2998) and December (Testing, 1727). 
 
+The purchase rate changes substantially between these periods, with November doubling that of our Training and Testing partitions. Since the model is trained on an earlier, lower purchase rate population, the model may underestimate probabilities later.
+
 The historical expanding-window folds predict July-November by using prior observations, while "policy replay" evaluates September with July and August, October with July-September, and November with July-October. 
 
 ----
 
 ## Data preparation & feature engineering
-
-*What you engineered and why, and any data-quality decisions you made along
-the way — e.g. "segment X had defective data, so I excluded it and used a
-population-average default for scope Y at inference time; the impact of
-that choice is Z."*
 
 `Revenue` and `Weekend` were converted to integer 0 and 1s. 
 Months were mapped to numbers for splitting and calendar transformations.
@@ -99,6 +86,10 @@ The last 3 groups are hypotheses regarding calendar periodicity and relationship
 
 Categorical traffic codes are not continuous quantities nor do their numerical distances have any meaning.
 
+This always assumes that technical information (i. e. browser and OS, traffic source info, visitor region...) can be obtained at session entry, based on prior entries. The dataset itself does not specify whether this would be realistic.
+
+I excluded the page count, duration, bounce rate, exit rate, and page value variables because they are recorded based on browsing activity, so it's information unavailable to the model if this is ex-ante.
+
 MonthNum is not a final model input, only being created for splitting and to construct `MonthSin` and `MonthCos`. 
 
 The following information is thus excluded from the model input list: `Administrative`, `Administrative_Duration`, `Informational`, `Informational_Duration`, `ProductRelated`, `ProductRelated_Duration`, `BounceRates`, `ExitRates`, `PageValues`.
@@ -110,18 +101,16 @@ The following information is thus excluded from the model input list: `Administr
 
 *Note: July–November; reported statistics average the five evaluation months; all candidates were compared using a fixed threshold of 0.25*
 
-| Feature specification | Mean monthly recall | Mean ROC-AUC | Mean log loss | Mean monthly scenario cost/session |
-|---|---:|---:|---:|---:|
-| A: Original entry-time fields | 0.1167 | 0.6108 | 0.5036 | 0.9522 |
-| B: A + cyclical calendar | 0.1294 | **0.6133** | 0.5019 | 0.9508 |
-| C: B + visitor interactions | 0.1367 | 0.6118 | 0.5007 | **0.9462** |
-| D: C + traffic/visitor segment | **0.1426** | 0.6119 | **0.5001** | 0.9483 |
+| Feature specification | Mean monthly recall | Mean monthly contact share | Mean ROC-AUC | Mean log loss | Mean monthly scenario cost/session |
+|---|---:|---:|---:|---:|---:|
+| A: Original entry-time fields | 0.1167 | 0.0838 | 0.6108 | 0.5036 | 0.9522 |
+| B: A + cyclical calendar | 0.1294 | 0.1009 | **0.6133** | 0.5019 | 0.9508 |
+| C: B + visitor interactions | 0.1367 | 0.1064 | 0.6118 | 0.5007 | **0.9462** |
+| D: C + traffic/visitor segment | **0.1426** | 0.1141 | 0.6119 | **0.5001** | 0.9483 |
 
-D was chosen for the pipeline, despite not being the "winner" for all evaluation quantities. D is prioritised because my main goal is to identify eventual purchasers, not to minimize the assumed financial cost (which is subject to hypothesis). 
+D was chosen for the pipeline, despite not being the "winner" for all evaluation quantities. D is prioritised because it achieved the highest average monthly purchaser recall under our threshold — which is perfectly consistent with my main goal (to identify eventual purchasers). It also increases higher average contact share. The improvement over C is in any case not all that substantial and comes at the cost of a slightly higher "cost", which is derived from hypothetical units. 
 
-Of course, the improvement in recall isn't extremely notorious and the additional interactions may have produced some more sparse categories.
-
-It should be noted the ablation does not compare separately optimized operating policies, since they are all evaluated against the final specification's fixed threshold.
+All four were evaluated on the same expanding window folds, with the same regularization strength and the fixed 0.25 threshold, so the comparison does not show each specification receiving its own optimized policy — more proof to say either D or C would have been fair choices. 
 
 ----
 
@@ -129,13 +118,11 @@ It should be noted the ablation does not compare separately optimized operating 
 - Validation and Test transformations produce `OneHotEncoder` warnings for categories not found in earlier training folds. 
 - The encoded columns include pretty specific traffic-visitor combinations, which may have limited historical basis.
 
+- **Unseen categories:** Some historical validation folds contain OS, browser, and other categories that were not observed in their corresponding training folds — which led to `OneHotEncoder` warnings. The warning is normal, if I've informed myself correctly, because `drop="first"` is also used, so this encoding can be confused with the dropped reference category within that group.
+- **Sparse interaction categories:** the combination of `TrafficType` and `VisitorType` creates some very specific categorical mixes/combinations that have little historical support.
+
 
 ## Modeling: three implementations, one model
-
-*Which model (linear or logistic regression) and why. A results table
-comparing scikit-learn, the manual PyTorch loop, and the standard
-torch.nn.Module/torch.optim workflow, on the same test set, against the
-naive baseline. Do the three agree? If not, why not?*
 
 Since the target is binary, I went for a logistic regression, using L2 regularization, the output of which is a predicted probability for "session purchase". All 3 implementations use the same Feb-Oct rows and 92 column matrix
 
@@ -153,7 +140,6 @@ Since the target is binary, I went for a logistic regression, using L2 regulariz
 The PyTorch models start with 0 weights and bias, while the manual version computes gradients via loss.backward(), applying parameter updates, then clearing gradients. The standard uses optimizer.zero_grad(), loss.backward() and optimizer.step()
 
 The C candidates were .1 and 1, which were selected using mean historical log-loss. .1 was chosen for the final run (July–August selection scores: 0.457 vs 0.471).
-
 
 ----
 
@@ -180,6 +166,9 @@ Maximum absolute **December probability** difference: scikit-learn vs manual = *
 
 The learned models have higher ROC-AUC and lower log loss than the constant baselines.
 
+At the default threshold (0.50), all three learned models predict negative class for every December session. Their recall and precision are therefore 0, and their accuracy is identical to the naive's.
+
+The learned models have a ROC-AUC of 0.6391, higher than the constant-probability's 0.5000, while also achieving lower log loss. Thus, the learned probabilities should contain useful information.
 
 ----
 
@@ -194,13 +183,15 @@ The learned models have higher ROC-AUC and lower log loss than the constant base
 
 This policy contacts 7.87% of December visitors. Purchasers represent 22.79% of these contacts, while December's purchasing rate is at 12.51%. 
 
-This means that, under the hypothetical cost scenario outlined earlier, we are saving 19 (units) in comparison to contacting nobody.
+This means that, under the hypothetical cost scenario outlined earlier, we are saving 19 (units) (1.76%) in comparison to contacting nobody. This is nevertheless an offline evaluation because of a lack of real staffing costs information.
 
 ----
 
 ### **Historical policy**
 
 I ran 3 fixed-cutoff strategies, replayed on Sep-Nov, using calibration info for each evaluation month.
+
+So for each evaluation month, the threshold was based only with earlier historical folds. The threshold was then applied to the predictions of the evaluation month without using that month's outcomes.
 
 | Historical replay (Sep–Nov) | Mean monthly recall | Mean monthly contact share | Highest monthly contact share | Within 20% in every replay month? |
 |---|---:|---:|---:|---|
@@ -210,19 +201,20 @@ I ran 3 fixed-cutoff strategies, replayed on Sep-Nov, using calibration info for
 
 The 3 of them broke the 20% contact-share limit we stated, and so the fallback kept Policy A. This is in no way evidence that A respects capacity.
 
+With no fixed threshold, each Policy re-estimated said cutoff, with Policy A using 0.2 in September which explains divergences.
+
+The replay stats are unweighted monthly averages, explaining the difference in monthly contact share (22.88% v. 16.5% for Policy A)
+
 Policy A's cutoff is 0.25, using historical folds for Jul-Nov.
 
 
 ## Limitations & next steps
 
-*Real limitations you found, and concretely how you'd address each one with
-more time or data — not generic hedging.*
-
-- Probability mismatch in November (16.36% vs. actual positive rate of 25.35%). It could help to investigate the calibration across the past months, and trying to see if more recent training data improves the reliability of these probabilities.
-- The 20% hypothetical staffing cap is never fully in force, with all candidates exceeding it at some point. Perhaps an adaptive cutoff of sorts could be implemented — if timestamps existed, these could use actual visitor arrival times and the corresponding staff availability.
-- Very limited temporal information, since there is nothing deeper than month (week, day, timestamp...). The dataset definitely struggles because of that, so further data collection would be very helpful.
-- The cost scenarios are fully hypothetical and may have led to a biased conclusion. If I could obtain the cost of customer assistance, the specific outcome of a proper assistance, or information on customer-value, that would enhance the choice of economic penalty.
-- On that same line, since the outcome of actually assisting is unoberved, perhaps running an experiment that could determine if proactive assistance actually changes purchase likelihood or customer satisfaction would amplify the scope of the project.
+- **Temporal change and probability reliability** (average November purchase probability of 16.36% vs. actual positive rate of 25.35%). The difference between the training November and December purchase rates indicates purchasing behavior is likely to chance a lot over time. With more historical data, it would be useful to examine probability calibration separately by period, and trying to see if more recent training data improves the reliability of these probabilities.
+- **The 20% hypothetical staffing cap is never fully in force**, with all candidates exceeding it at some point. Perhaps an adaptive cutoff of sorts could be implemented — if timestamps existed, these could use actual visitor arrival times and the corresponding staff availability.
+- **Very limited temporal information**, since there is nothing deeper than month (week, day, timestamp...). To make matters worse, January and April are absent. Although the cyclicar calendar features I incoprorated try to represent month to month continuity, it's hard to generalise. The dataset definitely struggles because of that, so further data collection would be very helpful.
+- **The cost scenarios are fully hypothetical** and may have led to a biased conclusion. If I could obtain the cost of customer assistance, the specific outcome of a proper assistance, or information on customer-value, that would enhance the choice of economic penalty.
+- **No causal effect of assistance**, since the dataset does not record if assistance changed a browser's decision. Perhaps running an experiment that could determine if proactive assistance actually changes purchase likelihood or customer satisfaction would amplify the scope of the project, and ultimately help the business.
 
 
 ## Generative AI use disclosure
